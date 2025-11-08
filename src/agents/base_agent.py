@@ -67,7 +67,7 @@ class OllamaAgent(ABC):
             payload["format"] = format
         
         try:
-            response = requests.post(url, json=payload, timeout=60)
+            response = requests.post(url, json=payload, timeout=120)
             response.raise_for_status()
             result = response.json()
             content = result.get("message", {}).get("content", "")

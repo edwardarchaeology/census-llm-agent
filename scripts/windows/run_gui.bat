@@ -1,6 +1,10 @@
 @echo off
 REM Launch Streamlit GUI for Louisiana Census Data Explorer
 
+setlocal
+set SCRIPT_DIR=%~dp0
+pushd "%SCRIPT_DIR%\..\.."
+
 echo.
 echo ========================================
 echo Louisiana Census Data Explorer
@@ -28,11 +32,12 @@ if not exist ".venv\Scripts\streamlit.exe" (
     echo ERROR: Streamlit not found in virtual environment!
     echo.
     echo Please install dependencies:
-    echo   .\setup_uv.bat
+    echo   scripts\windows\setup_uv.bat
     echo   OR
-    echo   pip install -r requirements.txt
+    echo   uv add -r requirements.txt
     echo.
     pause
+    popd
     exit /b 1
 )
 
@@ -46,3 +51,4 @@ REM Launch Streamlit
 .venv\Scripts\streamlit.exe run gui\app.py
 
 pause
+popd

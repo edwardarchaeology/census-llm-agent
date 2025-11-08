@@ -135,6 +135,7 @@ def _execute_simple_query(result: Dict[str, Any], verbose: bool = True) -> pd.Da
     # Select final columns
     result_df = df[["GEOID", "tract_name", "value"]].copy()
     result_df.attrs["label"] = variable["label"]
+    result_df.attrs["doc_context"] = variable.get("doc_context", [])
     
     if verbose:
         print(f">>> Found {len(result_df)} tracts")

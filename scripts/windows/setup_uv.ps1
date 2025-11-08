@@ -1,7 +1,11 @@
-# Louisiana Census Agent - Setup with UV
+﻿# Louisiana Census Agent - Setup with UV
 # This script rebuilds your environment with only necessary packages
 
-Write-Host ""
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Split-Path -Parent $scriptDir
+Push-Location $repoRoot
+
+Write-Host "" 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Louisiana Census Agent - UV Setup" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
@@ -17,6 +21,7 @@ if (-not $uvInstalled) {
     Write-Host "  OR" -ForegroundColor Yellow
     Write-Host "  powershell -c ""irm https://astral.sh/uv/install.ps1 | iex""" -ForegroundColor White
     Write-Host ""
+    Pop-Location
     exit 1
 }
 
@@ -34,6 +39,7 @@ $choice = Read-Host "Enter choice (1, 2, or 3)"
 
 if ($choice -eq "3") {
     Write-Host "Cancelled." -ForegroundColor Yellow
+    Pop-Location
     exit 0
 }
 
@@ -52,6 +58,7 @@ if ($choice -eq "1") {
     uv venv
     if ($LASTEXITCODE -ne 0) {
         Write-Host "ERROR: Failed to create venv" -ForegroundColor Red
+        Pop-Location
         exit 1
     }
     Write-Host "OK - Virtual environment created" -ForegroundColor Green
@@ -64,6 +71,7 @@ $env:UV_LINK_MODE = "copy"
 uv pip sync requirements.txt
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Failed to sync dependencies" -ForegroundColor Red
+    Pop-Location
     exit 1
 }
 Write-Host "OK - Dependencies synced" -ForegroundColor Green
@@ -90,3 +98,5 @@ Write-Host ""
 Write-Host "  3. Start querying:" -ForegroundColor White
 Write-Host "     python main.py" -ForegroundColor Gray
 Write-Host ""
+pause
+Pop-Location

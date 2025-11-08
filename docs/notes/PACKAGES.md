@@ -49,7 +49,7 @@ import shapefile
 
 ```powershell
 # Run the setup script
-.\setup_uv.ps1
+scripts\\windows\\setup_uv.ps1
 
 # Choose option 1 for clean rebuild
 ```
@@ -266,4 +266,4 @@ Install time: 3-5 seconds
 - [x] Created `setup_uv.ps1` script
 - [x] Created this documentation
 
-**Next:** Run `.\setup_uv.ps1` to rebuild your environment!
+**Next:** Run `scripts\\windows\\setup_uv.ps1` to rebuild your environment!

@@ -6,15 +6,15 @@
 
 ```powershell
 # Show available tests
-.\run_tests.bat
+scripts\windows\run_tests.bat
 
 # Run specific test
-.\run_tests.bat geography     # Test geography resolution
-.\run_tests.bat multiagent    # Test multi-agent system
-.\run_tests.bat basic         # Test basic functionality
+scripts\windows\run_tests.bat geography     # Test geography resolution
+scripts\windows\run_tests.bat multiagent    # Test multi-agent system
+scripts\windows\run_tests.bat basic         # Test basic functionality
 
 # Run all tests
-.\run_tests.bat all
+scripts\windows\run_tests.bat all
 ```
 
 ### Method 2: Direct Python (Manual)
@@ -24,7 +24,7 @@
 ```powershell
 # Run individual tests
 .\.venv\Scripts\python.exe tests\test_geography.py
-.\.venv\Scripts\python.exe tests\test_multiagent.py
+.\.venv\Scripts\python.exe tests\\manual\\\test_multiagent.py
 .\.venv\Scripts\python.exe tests\test_basic.py
 ```
 
@@ -38,7 +38,7 @@
 
 ### Core Tests
 
-- **test_multiagent.py** - Multi-agent system (5 comprehensive queries)
+- **tests/manual/test_multiagent.py** - Multi-agent system (5 comprehensive queries)
 - **test_geography.py** - Geography resolution (parishes & cities)
 - **test_basic.py** - Basic functionality
 - **test_query.py** - Query execution
@@ -71,7 +71,7 @@ python tests\test_basic.py
 
 ```powershell
 # Most comprehensive test
-python tests\test_multiagent.py
+python tests\\manual\\\test_multiagent.py
 ```
 
 ## 📊 Test Output
@@ -123,7 +123,7 @@ The tests use `conftest.py` which automatically adds `src/` to the path. Make su
 ```powershell
 # From project root
 cd "c:\Users\C00607628\OneDrive - University of Louisiana at Lafayette\Documents\github_repos\acs_llm_agent"
-python tests\test_multiagent.py
+python tests\\manual\\\test_multiagent.py
 ```
 
 ### Issue: Ollama Not Running
@@ -259,7 +259,7 @@ Remove-Item cache\* -Recurse
 | --------------------- | -------- | ------------ |
 | test_geography.py     | ~5 sec   | N/A (no LLM) |
 | test_basic.py         | ~30 sec  | 3-5 queries  |
-| test_multiagent.py    | ~2-3 min | 5 queries    |
+| tests/manual/test_multiagent.py | ~2-3 min | 5 queries    |
 | test_comprehensive.py | ~5 min   | 10+ queries  |
 | **Full suite**        | ~10 min  | All tests    |
 
@@ -296,7 +296,7 @@ jobs:
 Before committing code:
 
 - [ ] `python tests\test_geography.py` - Geography resolution works
-- [ ] `python tests\test_multiagent.py` - Multi-agent system works
+- [ ] `python tests\\manual\\\test_multiagent.py` - Multi-agent system works
 - [ ] `python main.py --compare` - CLI works
 - [ ] All tests pass without errors
 - [ ] No new warnings or deprecations

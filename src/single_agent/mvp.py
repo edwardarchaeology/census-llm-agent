@@ -65,7 +65,8 @@ def run_query(question: str, return_debug_info: bool = False) -> pd.DataFrame:
             "variable_id": result_info.get("variable_id"),
             "is_derived": result_info.get("is_derived", False),
             "variables": result_info.get("variables"),
-            "needs_area": result_info.get("needs_area", False)
+            "needs_area": result_info.get("needs_area", False),
+            "doc_context": result_info.get("doc_context", [])
         }
     }
     
@@ -138,6 +139,7 @@ def run_query(question: str, return_debug_info: bool = False) -> pd.DataFrame:
     # Select final columns
     result = df[["GEOID", "tract_name", "value"]].copy()
     result.attrs["label"] = label
+    result.attrs["doc_context"] = result_info.get("doc_context", [])
     
     # Attach debug info if requested
     if return_debug_info:

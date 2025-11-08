@@ -1,5 +1,8 @@
 @echo off
 REM Simple UV setup for Louisiana Census Agent
+setlocal
+set SCRIPT_DIR=%~dp0
+pushd "%SCRIPT_DIR%\..\.."
 
 echo.
 echo ========================================
@@ -14,6 +17,7 @@ if %ERRORLEVEL% NEQ 0 (
     echo.
     echo Install with: pip install uv
     pause
+    popd
     exit /b 1
 )
 
@@ -30,6 +34,7 @@ set /p choice="Enter choice (1, 2, or 3): "
 
 if "%choice%"=="3" (
     echo Cancelled.
+    popd
     exit /b 0
 )
 
@@ -49,6 +54,7 @@ if "%choice%"=="1" (
     if %ERRORLEVEL% NEQ 0 (
         echo ERROR: Failed to create venv
         pause
+        popd
         exit /b 1
     )
     echo OK - Virtual environment created
@@ -62,6 +68,7 @@ uv pip sync requirements.txt
 if %ERRORLEVEL% NEQ 0 (
     echo ERROR: Failed to sync dependencies
     pause
+    popd
     exit /b 1
 )
 echo OK - Dependencies synced
@@ -84,3 +91,5 @@ echo   2. Run tests: python tests\test_intent.py
 echo   3. Start querying: python main.py
 echo.
 pause
+popd
+exit /b 0

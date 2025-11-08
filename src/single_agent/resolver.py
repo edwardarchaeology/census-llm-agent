@@ -3,6 +3,7 @@ Census variable resolver with fuzzy matching and derived metrics registry.
 """
 import json
 import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -13,6 +14,12 @@ from rapidfuzz import fuzz
 
 CACHE_DIR = Path("./cache")
 CACHE_DIR.mkdir(exist_ok=True)
+
+SRC_ROOT = Path(__file__).resolve().parents[1]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from docs.retriever import search_docs, search_by_table
 
 # Derived metrics registry with safe formulas
 DERIVED_METRICS = {
@@ -218,6 +225,7 @@ def resolve_measure(phrase: str, year: int = 2023, top_n: int = 1) -> list[dict]
     # Check if it's a derived metric
     if phrase_normalized in DERIVED_METRICS:
         metric_info = DERIVED_METRICS[phrase_normalized]
+        doc_context = search_docs(metric_info["label"], top_k=3)
         return [{
             "variable_id": "DERIVED",
             "label": metric_info["label"],
@@ -226,7 +234,8 @@ def resolve_measure(phrase: str, year: int = 2023, top_n: int = 1) -> list[dict]
             "is_derived": True,
             "variables": metric_info["variables"],
             "needs_area": metric_info["needs_area"],
-            "formula": metric_info["formula"]
+            "formula": metric_info["formula"],
+            "doc_context": doc_context
         }]
     
     df = get_census_variables_cached(year)
@@ -291,13 +300,21 @@ def resolve_measure(phrase: str, year: int = 2023, top_n: int = 1) -> list[dict]
     results = []
     
     for _, row in df_sorted.head(top_n).iterrows():
+        table_id = None
+        var_id = row["variable_id"]
+        if isinstance(var_id, str) and "_" in var_id:
+            table_id = var_id.split("_")[0]
+        
+        doc_context = search_by_table(table_id, top_k=2) if table_id else search_docs(row["label"], top_k=2)
+        
         results.append({
             "variable_id": row["variable_id"],
             "label": clean_census_label(row["label"]),
             "concept": row["concept"],
             "description": row.get("description", ""),
             "score": row["adjusted_score"],
-            "is_derived": False
+            "is_derived": False,
+            "doc_context": doc_context
         })
     
     return results

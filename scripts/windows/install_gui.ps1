@@ -1,4 +1,9 @@
 # Install GUI dependencies for Louisiana Census Agent
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Split-Path -Parent $scriptDir
+Push-Location $repoRoot
+
+try {
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -48,7 +53,11 @@ Write-Host "  - folium (interactive maps)" -ForegroundColor White
 Write-Host "  - streamlit-folium (map integration)" -ForegroundColor White
 Write-Host ""
 Write-Host "You can now run the GUI:" -ForegroundColor Yellow
-Write-Host "  .\run_gui.ps1" -ForegroundColor Cyan
+Write-Host "  scripts\windows\run_gui.ps1" -ForegroundColor Cyan
 Write-Host "  OR" -ForegroundColor Yellow
-Write-Host "  streamlit run gui\app.py" -ForegroundColor Cyan
+Write-Host "  uv run streamlit run gui\app.py" -ForegroundColor Cyan
 Write-Host ""
+}
+finally {
+    Pop-Location
+}

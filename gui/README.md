@@ -22,7 +22,7 @@ Beautiful, interactive web interface for querying Louisiana census tract data wi
 
 ```powershell
 # Using UV (recommended)
-.\setup_uv.bat
+scripts\\windows\\setup_uv.bat
 # Choose option 1 for clean install
 
 # OR using pip
@@ -43,7 +43,7 @@ ollama pull phi3:mini
 
 ```powershell
 # Easy way
-.\run_gui.bat
+scripts\\windows\\run_gui.bat
 
 # OR manually
 streamlit run gui\app.py
@@ -205,7 +205,7 @@ Solution:
 
 ```
 Solution:
-1. Install dependencies: .\setup_uv.bat
+1. Install dependencies: scripts\\windows\\setup_uv.bat
 2. OR: pip install -r requirements.txt
 3. Verify: streamlit --version
 ```

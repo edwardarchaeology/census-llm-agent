@@ -8,6 +8,7 @@ from pathlib import Path
 import time
 from io import StringIO
 import json
+import textwrap
 
 import streamlit as st
 import pandas as pd
@@ -23,6 +24,7 @@ sys.path.insert(0, str(project_root / "src" / "single_agent"))
 from single_agent.mvp import run_query as run_single_agent_query
 from mvp_multiagent import run_multiagent_query
 from single_agent.resolver import clean_census_label
+from agents.variable_agent import VariableChatAgent
 
 
 # ============================================================================
@@ -72,6 +74,12 @@ def init_app():
     }
 
 
+@st.cache_resource(show_spinner=False)
+def get_variable_chat_helper():
+    """Instantiate the variable chat agent once per session."""
+    return VariableChatAgent()
+
+
 @st.cache_data(ttl=3600)
 def get_tract_geometries():
     """Load tract geometries for mapping (cached for 1 hour)."""
@@ -88,6 +96,8 @@ def init_session_state():
         st.session_state.current_result = None
     if "query_cache" not in st.session_state:
         st.session_state.query_cache = {}
+    if "variable_chat_history" not in st.session_state:
+        st.session_state.variable_chat_history = _default_variable_chat_history()
 
 
 # ============================================================================
@@ -151,6 +161,7 @@ def execute_query(query: str, mode: str, verbose: bool = False, force_refresh: b
             "execution_time": execution_time,
             "confidence": confidence,
             "label": result_df.attrs.get("label", "Census Data"),
+            "doc_context": result_df.attrs.get("doc_context", []),
             "debug_info": result_df.attrs.get("debug_info"),
             "verbose_output": verbose_output,
             "from_cache": False,
@@ -325,7 +336,136 @@ def render_example_queries():
             if st.button(f"📊 {label}", key=f"example_{i}", width="stretch"):
                 st.session_state.prefill_query = query
                 st.rerun()
+def _format_doc_snippet_preview(snippets, max_items: int = 3):
+    if not snippets:
+        return ""
+    lines = []
+    for snippet in snippets[:max_items]:
+        title = snippet.get("heading") or snippet.get("table_id") or snippet.get("source")
+        source = snippet.get("source", "")
+        lines.append(f"{title} ({source})")
+    remaining = len(snippets) - max_items
+    if remaining > 0:
+        lines.append(f"+{remaining} more source(s)")
+    return " | ".join(lines)
 
+
+def render_doc_references(snippets):
+    if not snippets:
+        return
+    st.markdown("#### ACS Documentation References")
+    for snippet in snippets:
+        title = snippet.get("heading") or snippet.get("table_id") or snippet.get("source")
+        source = snippet.get("source", "Unknown source")
+        text = textwrap.shorten(snippet.get("text", ""), width=260, placeholder="…")
+        st.markdown(f"- **{title}** ({source})")
+        st.caption(text)
+
+
+def _default_variable_chat_history():
+    """Seed messages for the variable assistant chat."""
+    return [{
+        "role": "assistant",
+        "content": (
+            "Hi! I'm the Variable Assistant. Ask me about ACS variables - IDs, descriptions, "
+            "and which metrics you can query in this app."
+        )
+    }]
+
+
+def _format_variable_candidate_preview(candidates, max_items: int = 3) -> str:
+    """Build a compact preview of candidate variables for the UI."""
+    if not candidates:
+        return ""
+
+    lines = []
+    for entry in candidates[:max_items]:
+        var_id = entry.get("variable_id", "N/A")
+        label = entry.get("label", "Unknown label")
+        lines.append(f"{var_id} - {label}")
+
+    remaining = len(candidates) - max_items
+    if remaining > 0:
+        lines.append(f"+{remaining} more suggestion(s)")
+
+    return "\n".join(lines)
+
+
+def reset_variable_chat_history():
+    """Clear the chat transcript and agent memory."""
+    st.session_state.variable_chat_history = _default_variable_chat_history()
+    helper = get_variable_chat_helper()
+    helper.reset_history()
+
+
+def _handle_variable_chat_prompt(question: str):
+    """Send the user's question to the chat agent and display a response."""
+    agent = get_variable_chat_helper()
+    st.session_state.variable_chat_history.append({"role": "user", "content": question})
+
+    with st.chat_message("user"):
+        st.markdown(question)
+
+    with st.chat_message("assistant"):
+        with st.spinner("Checking ACS documentation..."):
+            try:
+                reply = agent.answer_question(question)
+                answer = reply.get("answer", "")
+                candidates = reply.get("candidates", [])
+                doc_snippets = reply.get("doc_snippets", [])
+            except Exception as exc:
+                answer = (
+                    "Unable to reach the variable assistant right now. "
+                    "Please verify that Ollama is running and try again.\n\n"
+                    f"Details: {exc}"
+                )
+                candidates = []
+                doc_snippets = []
+
+        st.markdown(answer)
+        preview = _format_variable_candidate_preview(candidates)
+        if preview:
+            st.caption(preview)
+        doc_preview = _format_doc_snippet_preview(doc_snippets)
+        if doc_preview:
+            st.caption(f"Sourced from: {doc_preview}")
+
+    st.session_state.variable_chat_history.append({
+        "role": "assistant",
+        "content": answer,
+        "candidates": candidates,
+        "doc_snippets": doc_snippets
+    })
+
+    st.rerun()
+
+
+def render_variable_chatbox():
+    """Render the chat interface for asking about ACS variables."""
+    st.markdown("### Variable Assistant")
+    st.caption("Chat with the LLM to learn which ACS variables cover a topic or how to reference them.")
+
+    clear_col, spacer_col = st.columns([1, 6])
+    with clear_col:
+        if st.button("Clear chat", key="clear_variable_chat"):
+            reset_variable_chat_history()
+            st.rerun()
+    spacer_col.empty()
+
+    for message in st.session_state.variable_chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+            if message.get("candidates"):
+                preview = _format_variable_candidate_preview(message["candidates"])
+                if preview:
+                    st.caption(preview)
+            doc_preview = _format_doc_snippet_preview(message.get("doc_snippets", []))
+            if doc_preview:
+                st.caption(f"Sourced from: {doc_preview}")
+
+    prompt = st.chat_input("Ask about ACS variables...", key="variable_chat_input")
+    if prompt:
+        _handle_variable_chat_prompt(prompt)
 
 def render_map(result_df: pd.DataFrame, label: str = "Value"):
     """Render interactive map with census tracts."""
@@ -840,6 +980,9 @@ def main():
         with tab3:
             render_download_buttons(result["dataframe"], result)
         
+        if result.get("doc_context"):
+            render_doc_references(result["doc_context"])
+        
         # Debug/Verbose information
         if verbose or result.get('verbose_output'):
             with st.expander("🔍 Detailed Query Execution Log", expanded=False):
@@ -886,6 +1029,15 @@ def main():
                             "needs_area_data": resolved.get('needs_area')
                         })
                     
+                    doc_snippets = resolved.get('doc_context') or result.get('doc_context', [])
+                    if doc_snippets:
+                        st.markdown("**Documentation Sources:**")
+                        for snippet in doc_snippets:
+                            title = snippet.get("heading") or snippet.get("table_id") or snippet.get("source")
+                            source = snippet.get("source", "Unknown source")
+                            quoted = textwrap.shorten(snippet.get("text", ""), width=200, placeholder="…")
+                            st.caption(f"{title} ({source}): {quoted}")
+                    
                     # Show what was queried from Census API
                     st.markdown("---")
                     st.markdown("#### Census API Query")
@@ -930,6 +1082,9 @@ def main():
                     width="stretch",
                     height=200
                 )
+
+    st.markdown("---")
+    render_variable_chatbox()
 
 
 # ============================================================================

@@ -1,5 +1,8 @@
 @echo off
 REM Install GUI dependencies for Louisiana Census Agent
+setlocal
+set SCRIPT_DIR=%~dp0
+pushd "%SCRIPT_DIR%\..\.."
 
 echo.
 echo ========================================
@@ -51,8 +54,9 @@ echo   - folium (interactive maps)
 echo   - streamlit-folium (map integration)
 echo.
 echo You can now run the GUI:
-echo   .\run_gui.bat
+echo   scripts\windows\run_gui.bat
 echo   OR
-echo   streamlit run gui\app.py
+echo   uv run streamlit run gui\app.py
 echo.
 pause
+popd
