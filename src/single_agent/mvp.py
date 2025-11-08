@@ -2,25 +2,31 @@
 MVP CLI runner for LLM Census Data Getter.
 """
 import sys
+import os
 from typing import Optional
 
 import pandas as pd
 
-from intent import extract_intent, Intent
-from resolver import resolve_measure, get_derived_metric_info
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
+from single_agent.intent import extract_intent, Intent
+from single_agent.resolver import resolve_measure, get_derived_metric_info
 from acs_tools import fetch_data_for_query
 
 
-def run_query(question: str) -> pd.DataFrame:
+def run_query(question: str, return_debug_info: bool = False) -> pd.DataFrame:
     """
     Main query orchestration: extract intent, resolve measure, fetch data, compute result.
     
     Args:
         question: Natural language query
+        return_debug_info: If True, store debug info in df.attrs
     
     Returns:
         DataFrame with GEOID, tract_name, value, sorted appropriately
         The human-readable label is stored in df.attrs["label"]
+        Debug info stored in df.attrs["debug_info"] if return_debug_info=True
     """
     print(f"\n>>> Analyzing: {question}")
     
@@ -40,6 +46,28 @@ def run_query(question: str) -> pd.DataFrame:
     label = result_info["label"]
     
     print(f"Resolved to: {label}")
+    
+    # Build debug info
+    debug_info = {
+        "intent": {
+            "task": intent.task,
+            "measure": intent.measure,
+            "limit": intent.limit,
+            "sort": intent.sort,
+            "county_fips": intent.geography.county_fips,
+            "op": intent.op,
+            "value": intent.value,
+            "range_min": intent.range_min,
+            "range_max": intent.range_max
+        },
+        "resolved": {
+            "label": label,
+            "variable_id": result_info.get("variable_id"),
+            "is_derived": result_info.get("is_derived", False),
+            "variables": result_info.get("variables"),
+            "needs_area": result_info.get("needs_area", False)
+        }
+    }
     
     # Fetch data based on whether it's derived or direct
     is_percentage_metric = False
@@ -110,6 +138,10 @@ def run_query(question: str) -> pd.DataFrame:
     # Select final columns
     result = df[["GEOID", "tract_name", "value"]].copy()
     result.attrs["label"] = label
+    
+    # Attach debug info if requested
+    if return_debug_info:
+        result.attrs["debug_info"] = debug_info
     
     print(f"Found {len(result)} tracts")
     

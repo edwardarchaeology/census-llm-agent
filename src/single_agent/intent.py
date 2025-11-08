@@ -4,10 +4,15 @@ Intent extraction from natural language using Ollama.
 import json
 import os
 import re
+import sys
 from typing import Optional
 
 import requests
 from pydantic import BaseModel, Field
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from geography import resolve_geography
 
 OLLAMA_ENDPOINT = os.getenv("OLLAMA_ENDPOINT", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "phi3:mini")
@@ -76,18 +81,20 @@ def normalize_value(text: str) -> Optional[float]:
 
 
 def extract_city_county(question: str) -> Optional[str]:
-    """Extract county FIPS from city mentions."""
+    """Extract county FIPS from geographic mentions in the question."""
     question_lower = question.lower()
     
-    city_map = {
-        "new orleans": "071",
-        "baton rouge": "033",
-        "lafayette": "055",
-    }
+    # Try to extract any Louisiana parish or city mentioned
+    # Use the comprehensive geography module
+    words = question_lower.split()
     
-    for city, fips in city_map.items():
-        if city in question_lower:
-            return fips
+    # Try multi-word combinations first (e.g., "New Orleans", "East Baton Rouge")
+    for i in range(len(words)):
+        for j in range(i + 4, i, -1):  # Try up to 4-word combinations
+            phrase = " ".join(words[i:j])
+            _, county_fips = resolve_geography(phrase)
+            if county_fips:
+                return county_fips
     
     return None
 
@@ -107,28 +114,43 @@ Return ONLY valid JSON matching this schema:
   "range_min": number (for range),
   "range_max": number (for range),
   "limit": number (for top/bottom),
-  "sort": "asc|desc"
+  "sort": "asc|desc" (OPTIONAL - omit to use default)
 }}
+
+IMPORTANT RULES:
+- "top" means HIGHEST values (sort: desc) - omit "sort" field to use default
+- "bottom" means LOWEST values (sort: asc) - omit "sort" field to use default
+- "top X by poverty rate" means X tracts with HIGHEST poverty (desc)
+- "lowest X by poverty rate" means X tracts with LOWEST poverty (asc)
 
 Examples:
 
 Q: "What tract has the highest median income in New Orleans?"
-A: {{"task": "top", "measure": "median income", "limit": 1, "sort": "desc"}}
+A: {{"task": "top", "measure": "median income", "limit": 1}}
 
 Q: "Give me all tracts with 20% or more African Americans"
 A: {{"task": "filter", "measure": "african american share", "op": ">=", "value": 0.2}}
 
 Q: "lowest 5 poverty rate tracts in Lafayette"
-A: {{"task": "bottom", "measure": "poverty rate", "limit": 5, "sort": "asc"}}
+A: {{"task": "bottom", "measure": "poverty rate", "limit": 5}}
 
 Q: "top 10 population density tracts"
-A: {{"task": "top", "measure": "population density", "limit": 10, "sort": "desc"}}
+A: {{"task": "top", "measure": "population density", "limit": 10}}
+
+Q: "top 5 tracts by poverty rate in Caddo Parish"
+A: {{"task": "top", "measure": "poverty rate", "limit": 5}}
 
 Q: "median income between 40k and 75k"
-A: {{"task": "range", "measure": "median income", "range_min": 40000, "range_max": 75000, "sort": "asc"}}
+A: {{"task": "range", "measure": "median income", "range_min": 40000, "range_max": 75000}}
 
 Q: "income under 35k in Baton Rouge"
 A: {{"task": "filter", "measure": "median income", "op": "<", "value": 35000}}
+
+Q: "tracts with poverty rate under 10%"
+A: {{"task": "filter", "measure": "poverty rate", "op": "<", "value": 10}}
+
+Q: "poverty rate over 40 percent"
+A: {{"task": "filter", "measure": "poverty rate", "op": ">", "value": 40}}
 
 Now extract intent from this question:
 Q: "{question}"

@@ -1,7 +1,13 @@
 """
 Tests for intent extraction.
 """
+import sys
+import os
 import pytest
+
+# Add src directory to path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'single_agent'))
+
 from intent import extract_intent, normalize_value, extract_city_county
 
 

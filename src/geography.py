@@ -1,0 +1,290 @@
+"""
+Extended geography mappings for Louisiana.
+Includes all parishes and major cities.
+"""
+
+# All Louisiana parishes with their FIPS codes
+LOUISIANA_PARISHES = {
+    "acadia": "001",
+    "acadia parish": "001",
+    "allen": "003",
+    "allen parish": "003",
+    "ascension": "005",
+    "ascension parish": "005",
+    "assumption": "007",
+    "assumption parish": "007",
+    "avoyelles": "009",
+    "avoyelles parish": "009",
+    "beauregard": "011",
+    "beauregard parish": "011",
+    "bienville": "013",
+    "bienville parish": "013",
+    "bossier": "015",
+    "bossier parish": "015",
+    "caddo": "017",
+    "caddo parish": "017",
+    "calcasieu": "019",
+    "calcasieu parish": "019",
+    "caldwell": "021",
+    "caldwell parish": "021",
+    "cameron": "023",
+    "cameron parish": "023",
+    "catahoula": "025",
+    "catahoula parish": "025",
+    "claiborne": "027",
+    "claiborne parish": "027",
+    "concordia": "029",
+    "concordia parish": "029",
+    "de soto": "031",
+    "desoto": "031",
+    "de soto parish": "031",
+    "desoto parish": "031",
+    "east baton rouge": "033",
+    "east baton rouge parish": "033",
+    "baton rouge": "033",  # Most common city reference
+    "east carroll": "035",
+    "east carroll parish": "035",
+    "east feliciana": "037",
+    "east feliciana parish": "037",
+    "evangeline": "039",
+    "evangeline parish": "039",
+    "franklin": "041",
+    "franklin parish": "041",
+    "grant": "043",
+    "grant parish": "043",
+    "iberia": "045",
+    "iberia parish": "045",
+    "iberville": "047",
+    "iberville parish": "047",
+    "jackson": "049",
+    "jackson parish": "049",
+    "jefferson": "051",
+    "jefferson parish": "051",
+    "jefferson davis": "053",
+    "jefferson davis parish": "053",
+    "lafayette": "055",
+    "lafayette parish": "055",
+    "lafourche": "057",
+    "lafourche parish": "057",
+    "la salle": "059",
+    "lasalle": "059",
+    "la salle parish": "059",
+    "lasalle parish": "059",
+    "lincoln": "061",
+    "lincoln parish": "061",
+    "livingston": "063",
+    "livingston parish": "063",
+    "madison": "065",
+    "madison parish": "065",
+    "morehouse": "067",
+    "morehouse parish": "067",
+    "natchitoches": "069",
+    "natchitoches parish": "069",
+    "orleans": "071",
+    "orleans parish": "071",
+    "new orleans": "071",  # Most common city reference
+    "ouachita": "073",
+    "ouachita parish": "073",
+    "monroe": "073",  # Major city in Ouachita
+    "plaquemines": "075",
+    "plaquemines parish": "075",
+    "pointe coupee": "077",
+    "pointe coupee parish": "077",
+    "rapides": "079",
+    "rapides parish": "079",
+    "alexandria": "079",  # Major city in Rapides
+    "red river": "081",
+    "red river parish": "081",
+    "richland": "083",
+    "richland parish": "083",
+    "sabine": "085",
+    "sabine parish": "085",
+    "st. bernard": "087",
+    "st bernard": "087",
+    "saint bernard": "087",
+    "st. bernard parish": "087",
+    "st bernard parish": "087",
+    "st. charles": "089",
+    "st charles": "089",
+    "saint charles": "089",
+    "st. charles parish": "089",
+    "st charles parish": "089",
+    "st. helena": "091",
+    "st helena": "091",
+    "saint helena": "091",
+    "st. helena parish": "091",
+    "st helena parish": "091",
+    "st. james": "093",
+    "st james": "093",
+    "saint james": "093",
+    "st. james parish": "093",
+    "st james parish": "093",
+    "st. john the baptist": "095",
+    "st john the baptist": "095",
+    "saint john the baptist": "095",
+    "st. john the baptist parish": "095",
+    "st john the baptist parish": "095",
+    "st. landry": "097",
+    "st landry": "097",
+    "saint landry": "097",
+    "st. landry parish": "097",
+    "st landry parish": "097",
+    "st. martin": "099",
+    "st martin": "099",
+    "saint martin": "099",
+    "st. martin parish": "099",
+    "st martin parish": "099",
+    "st. mary": "101",
+    "st mary": "101",
+    "saint mary": "101",
+    "st. mary parish": "101",
+    "st mary parish": "101",
+    "st. tammany": "103",
+    "st tammany": "103",
+    "saint tammany": "103",
+    "st. tammany parish": "103",
+    "st tammany parish": "103",
+    "tangipahoa": "105",
+    "tangipahoa parish": "105",
+    "tensas": "107",
+    "tensas parish": "107",
+    "terrebonne": "109",
+    "terrebonne parish": "109",
+    "union": "111",
+    "union parish": "111",
+    "vermilion": "113",
+    "vermilion parish": "113",
+    "vernon": "115",
+    "vernon parish": "115",
+    "washington": "117",
+    "washington parish": "117",
+    "webster": "119",
+    "webster parish": "119",
+    "west baton rouge": "121",
+    "west baton rouge parish": "121",
+    "west carroll": "123",
+    "west carroll parish": "123",
+    "west feliciana": "125",
+    "west feliciana parish": "125",
+    "winn": "127",
+    "winn parish": "127",
+    # Additional major cities
+    "shreveport": "017",  # Caddo Parish
+    "lake charles": "019",  # Calcasieu Parish
+    "kenner": "051",  # Jefferson Parish
+    "bossier city": "015",  # Bossier Parish
+    "houma": "109",  # Terrebonne Parish
+}
+
+# Major cities mapped to their parishes (FIPS codes)
+MAJOR_CITIES = {
+    "new orleans": "071",
+    "baton rouge": "033",
+    "shreveport": "017",
+    "lafayette": "055",
+    "lake charles": "019",
+    "kenner": "051",
+    "bossier city": "015",
+    "monroe": "073",
+    "alexandria": "079",
+    "houma": "109",
+}
+
+# Reverse mapping: FIPS code to parish name
+FIPS_TO_PARISH = {
+    "001": "Acadia Parish",
+    "003": "Allen Parish",
+    "005": "Ascension Parish",
+    "007": "Assumption Parish",
+    "009": "Avoyelles Parish",
+    "011": "Beauregard Parish",
+    "013": "Bienville Parish",
+    "015": "Bossier Parish",
+    "017": "Caddo Parish",
+    "019": "Calcasieu Parish",
+    "021": "Caldwell Parish",
+    "023": "Cameron Parish",
+    "025": "Catahoula Parish",
+    "027": "Claiborne Parish",
+    "029": "Concordia Parish",
+    "031": "De Soto Parish",
+    "033": "East Baton Rouge Parish",
+    "035": "East Carroll Parish",
+    "037": "East Feliciana Parish",
+    "039": "Evangeline Parish",
+    "041": "Franklin Parish",
+    "043": "Grant Parish",
+    "045": "Iberia Parish",
+    "047": "Iberville Parish",
+    "049": "Jackson Parish",
+    "051": "Jefferson Parish",
+    "053": "Jefferson Davis Parish",
+    "055": "Lafayette Parish",
+    "057": "Lafourche Parish",
+    "059": "LaSalle Parish",
+    "061": "Lincoln Parish",
+    "063": "Livingston Parish",
+    "065": "Madison Parish",
+    "067": "Morehouse Parish",
+    "069": "Natchitoches Parish",
+    "071": "Orleans Parish",
+    "073": "Ouachita Parish",
+    "075": "Plaquemines Parish",
+    "077": "Pointe Coupee Parish",
+    "079": "Rapides Parish",
+    "081": "Red River Parish",
+    "083": "Richland Parish",
+    "085": "Sabine Parish",
+    "087": "St. Bernard Parish",
+    "089": "St. Charles Parish",
+    "091": "St. Helena Parish",
+    "093": "St. James Parish",
+    "095": "St. John the Baptist Parish",
+    "097": "St. Landry Parish",
+    "099": "St. Martin Parish",
+    "101": "St. Mary Parish",
+    "103": "St. Tammany Parish",
+    "105": "Tangipahoa Parish",
+    "107": "Tensas Parish",
+    "109": "Terrebonne Parish",
+    "111": "Union Parish",
+    "113": "Vermilion Parish",
+    "115": "Vernon Parish",
+    "117": "Washington Parish",
+    "119": "Webster Parish",
+    "121": "West Baton Rouge Parish",
+    "123": "West Carroll Parish",
+    "125": "West Feliciana Parish",
+    "127": "Winn Parish",
+}
+
+
+def resolve_geography(location_text: str) -> tuple[str, str]:
+    """
+    Resolve a location string to state and county FIPS codes.
+    
+    Args:
+        location_text: Natural language location (e.g., "New Orleans", "Lafayette Parish")
+    
+    Returns:
+        Tuple of (state_fips, county_fips)
+    """
+    location_lower = location_text.lower().strip()
+    
+    # Check if it's Louisiana or statewide
+    if location_lower in ["louisiana", "la", "statewide", "state"]:
+        return ("22", None)
+    
+    # Check parish/city mappings
+    county_fips = LOUISIANA_PARISHES.get(location_lower)
+    
+    if county_fips:
+        return ("22", county_fips)
+    
+    # If not found, return statewide
+    return ("22", None)
+
+
+def get_parish_name(county_fips: str) -> str:
+    """Get the parish name for a given FIPS code."""
+    return FIPS_TO_PARISH.get(county_fips, f"Parish {county_fips}")

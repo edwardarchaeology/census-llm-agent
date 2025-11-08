@@ -1,7 +1,55 @@
 [project]
 name = "acs-llm-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Louisiana Census Data Agent - Natural language interface for ACS data"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+authors = [
+    {name = "Edward", email = "edwardarchaeology@github"}
+]
+keywords = ["census", "llm", "ollama", "louisiana", "acs", "natural-language"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: GIS",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    # Core data processing
+    "pandas>=2.2.0",
+    
+    # HTTP requests (for Ollama API and Census API)
+    "requests>=2.32.0",
+    
+    # Data validation
+    "pydantic>=2.8.0",
+    
+    # Fuzzy string matching (for variable resolution)
+    "rapidfuzz>=3.9.0",
+    
+    # Shapefile reading (for TIGER/Line tract areas)
+    "pyshp>=2.3.0",
+    
+    # GUI (Streamlit)
+    "streamlit>=1.28.0",
+    "folium>=0.15.0",
+    "streamlit-folium>=0.15.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+]
+
+[project.scripts]
+census-agent = "main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.3.4",
+]

@@ -63,6 +63,36 @@ def normalize_measure(phrase: str) -> str:
     return MEASURE_SYNONYMS.get(phrase_lower, phrase_lower)
 
 
+def clean_census_label(label: str) -> str:
+    """
+    Clean up Census variable labels for display.
+    
+    Removes:
+    - "Estimate!!" prefixes
+    - "Annotation!!" prefixes
+    - Multiple exclamation marks
+    - Leading/trailing whitespace
+    
+    Examples:
+        "Estimate!!Median nonfamily household income..." -> "Median nonfamily household income..."
+        "Estimate!!Total!!Population" -> "Total Population"
+    """
+    if not label:
+        return label
+    
+    # Remove "Estimate!!" and "Annotation!!" prefixes
+    label = label.replace("Estimate!!", "")
+    label = label.replace("Annotation!!", "")
+    
+    # Replace remaining double exclamation marks with spaces
+    label = label.replace("!!", " ")
+    
+    # Clean up multiple spaces and trim
+    label = " ".join(label.split())
+    
+    return label
+
+
 def get_census_variables_cached(year: int = 2023, ttl_days: int = 14) -> pd.DataFrame:
     """
     Download and cache Census ACS 5-year variables metadata.
@@ -89,10 +119,17 @@ def get_census_variables_cached(year: int = 2023, ttl_days: int = 14) -> pd.Data
         if isinstance(meta, dict) and meta.get("predicateType") in ["int", "float", "string"]:
             # Check if it's a data variable (starts with letter, contains underscore, ends with E)
             if "_" in var_id and var_id[0].isalpha() and "E" in var_id:
+                label = meta.get("label", "")
+                concept = meta.get("concept", "")
+                
+                # Create human-readable description
+                description = _create_variable_description(var_id, label, concept)
+                
                 records.append({
                     "variable_id": var_id,
-                    "label": meta.get("label", ""),
-                    "concept": meta.get("concept", ""),
+                    "label": label,
+                    "concept": concept,
+                    "description": description,
                     "predicateType": meta.get("predicateType", ""),
                 })
     
@@ -106,6 +143,53 @@ def get_census_variables_cached(year: int = 2023, ttl_days: int = 14) -> pd.Data
     df["table"] = df["variable_id"].str.extract(r"^([A-Z]+\d+)")[0]
     
     return df
+
+
+def _create_variable_description(var_id: str, label: str, concept: str) -> str:
+    """
+    Create a human-readable description for a Census variable.
+    Helps LLM agents understand what the variable represents.
+    """
+    # Clean up the label
+    clean_label = clean_census_label(label)
+    
+    # Build description
+    parts = []
+    
+    # Add what it measures
+    if clean_label:
+        parts.append(f"Measures: {clean_label}")
+    
+    # Add context from concept if different from label
+    if concept and concept.lower() != clean_label.lower():
+        clean_concept = clean_census_label(concept)
+        # Check if concept adds new information
+        if clean_concept.lower() not in clean_label.lower():
+            parts.append(f"Context: {clean_concept}")
+    
+    # Identify the type of data based on table prefix
+    table_prefix = var_id.split("_")[0] if "_" in var_id else ""
+    
+    if table_prefix.startswith("B01"):
+        parts.append("Category: Population and Age")
+    elif table_prefix.startswith("B02"):
+        parts.append("Category: Race")
+    elif table_prefix.startswith("B03"):
+        parts.append("Category: Hispanic/Latino Origin")
+    elif table_prefix.startswith("B17"):
+        parts.append("Category: Poverty Status")
+    elif table_prefix.startswith("B19"):
+        parts.append("Category: Income")
+    elif table_prefix.startswith("B23"):
+        parts.append("Category: Employment Status")
+    elif table_prefix.startswith("B25"):
+        parts.append("Category: Housing Characteristics")
+    
+    # Indicate if it's a total/main estimate
+    if var_id.endswith("_001E"):
+        parts.append("Type: Main estimate or total")
+    
+    return " | ".join(parts) if parts else clean_label
 
 
 def _download_variables(year: int, cache_file: Path) -> dict:
@@ -158,6 +242,34 @@ def resolve_measure(phrase: str, year: int = 2023, top_n: int = 1) -> list[dict]
     # Combined score (weighted average)
     df["score"] = df["label_score"] * 0.7 + df["concept_score"] * 0.3
     
+    # Penalty for demographic-specific variables (prefer general population stats)
+    # Look for race/ethnicity qualifiers in the concept or label
+    demographic_keywords = [
+        "white alone", "black alone", "african american alone", "asian alone", 
+        "hispanic", "latino", "native hawaiian", "pacific islander", 
+        "american indian", "alaska native", "two or more races",
+        "nonveteran", "veteran", "food stamps", "snap",
+        "foreign born", "native born", "citizen", "noncitizen",
+        "renter occupied", "owner occupied", "with a mortgage", "without a mortgage",
+        "male householder", "female householder", "nonfamily household"
+    ]
+    
+    def has_demographic_filter(text):
+        if pd.isna(text):
+            return False
+        text_lower = str(text).lower()
+        return any(keyword in text_lower for keyword in demographic_keywords)
+    
+    df["has_demographic"] = df["concept"].apply(has_demographic_filter) | df["label"].apply(has_demographic_filter)
+    
+    # Apply penalty: subtract 15 points for demographic-specific variables
+    df.loc[df["has_demographic"], "score"] = df.loc[df["has_demographic"], "score"] - 15
+    
+    # Boost for simple, canonical variables (e.g., B19013_001E for median household income)
+    # Variables ending in _001E are often the "total" or main estimate
+    df["is_main_estimate"] = df["variable_id"].str.endswith("_001E")
+    df.loc[df["is_main_estimate"], "score"] = df.loc[df["is_main_estimate"], "score"] + 5
+    
     # Table preference penalty: DP=0, S=0.5, B=1.0, others=2.0
     def table_penalty(table_prefix):
         if pd.isna(table_prefix):
@@ -181,8 +293,9 @@ def resolve_measure(phrase: str, year: int = 2023, top_n: int = 1) -> list[dict]
     for _, row in df_sorted.head(top_n).iterrows():
         results.append({
             "variable_id": row["variable_id"],
-            "label": row["label"],
+            "label": clean_census_label(row["label"]),
             "concept": row["concept"],
+            "description": row.get("description", ""),
             "score": row["adjusted_score"],
             "is_derived": False
         })
