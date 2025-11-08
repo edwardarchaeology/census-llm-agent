@@ -32,6 +32,20 @@ uv run python main.py --mode multi
 uv run streamlit run gui/app.py
 ```
 
+### Docker Deployment
+
+```bash
+docker compose build
+docker compose up
+```
+
+Services:
+
+- `ollama`: runs `ollama serve` and stores models in the `ollama-data` volume.
+- `app`: builds this repo, runs `scripts/build_doc_index.py`, and launches Streamlit on port 8501.
+
+Visit `http://localhost:8501` after both containers are healthy. The Ollama API is forwarded on `http://localhost:11434` for debugging or model management (`docker compose exec ollama ollama pull phi3:mini`).
+
 ## Documentation
 
 - **[Usage Guide](docs/USAGE_GUIDE.md)** - Comprehensive guide with examples and tips

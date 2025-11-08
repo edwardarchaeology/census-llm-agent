@@ -1,0 +1,27 @@
+version: "3.9"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    command: ["ollama", "serve"]
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+
+  app:
+    build: .
+    depends_on:
+      - ollama
+    environment:
+      OLLAMA_ENDPOINT: http://ollama:11434
+    ports:
+      - "8501:8501"
+    volumes:
+      - cache-data:/app/cache
+    restart: unless-stopped
+
+volumes:
+  ollama-data:
+  cache-data:
