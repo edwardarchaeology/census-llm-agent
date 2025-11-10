@@ -20,11 +20,20 @@ import requests
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 sys.path.insert(0, str(project_root / "src" / "single_agent"))
+sys.path.insert(0, str(project_root / "src" / "langchain_features"))
 
 from single_agent.mvp import run_query as run_single_agent_query
 from mvp_multiagent import run_multiagent_query
 from single_agent.resolver import clean_census_label
 from agents.variable_agent import VariableChatAgent
+
+# LangChain features
+try:
+    from query_engine import LangChainQueryEngine
+    LANGCHAIN_AVAILABLE = True
+except ImportError as e:
+    LANGCHAIN_AVAILABLE = False
+    print(f"⚠️  LangChain features not available: {e}")
 
 
 # ============================================================================
@@ -98,18 +107,36 @@ def init_session_state():
         st.session_state.query_cache = {}
     if "variable_chat_history" not in st.session_state:
         st.session_state.variable_chat_history = _default_variable_chat_history()
+    
+    # Initialize LangChain query engine for main queries
+    if "langchain_engine" not in st.session_state and LANGCHAIN_AVAILABLE:
+        try:
+            st.session_state.langchain_engine = LangChainQueryEngine()
+        except Exception as e:
+            print(f"Failed to initialize LangChain query engine: {e}")
+            st.session_state.langchain_engine = None
+    
+    # Initialize LangChain memory for Variable Assistant chat
+    if "variable_chat_memory" not in st.session_state and LANGCHAIN_AVAILABLE:
+        try:
+            from conversation_memory import ConversationalMemory
+            st.session_state.variable_chat_memory = ConversationalMemory(max_history=15)
+        except Exception as e:
+            print(f"Failed to initialize Variable Assistant memory: {e}")
+            st.session_state.variable_chat_memory = None
 
 
 # ============================================================================
 # QUERY EXECUTION
 # ============================================================================
 
-def execute_query(query: str, mode: str, verbose: bool = False, force_refresh: bool = False) -> dict:
+def execute_query(query: str, mode: str, verbose: bool = False, force_refresh: bool = False, 
+                 use_memory: bool = False, use_rag: bool = False) -> dict:
     """Execute query and return results with metadata."""
     start_time = time.time()
     
     # Check cache first (unless force refresh)
-    cache_key = f"{mode}:{query}"
+    cache_key = f"{mode}:{query}:{use_memory}:{use_rag}"
     if not force_refresh and cache_key in st.session_state.query_cache:
         cached = st.session_state.query_cache[cache_key]
         return {
@@ -123,6 +150,46 @@ def execute_query(query: str, mode: str, verbose: bool = False, force_refresh: b
         del st.session_state.query_cache[cache_key]
     
     try:
+        # Use LangChain engine if memory or RAG enabled
+        if (use_memory or use_rag) and st.session_state.get("langchain_engine"):
+            engine = st.session_state.langchain_engine
+            lc_result = engine.process_query(
+                query=query,
+                mode=mode,
+                verbose=verbose,
+                use_memory=use_memory,
+                use_rag=use_rag
+            )
+            
+            if lc_result.get("success"):
+                result_df = lc_result["dataframe"]
+                label = lc_result["label"]
+                debug_info = lc_result.get("debug_info", {})
+                
+                result = {
+                    "dataframe": result_df,
+                    "label": label,
+                    "mode": mode,
+                    "query": query,
+                    "debug_info": debug_info,
+                    "execution_time": time.time() - start_time,
+                    "from_cache": False,
+                    "is_follow_up": lc_result.get("is_follow_up", False),
+                    "inferred_context": lc_result.get("inferred_context"),
+                    "rag_context": lc_result.get("rag_context"),
+                    "conversation_summary": lc_result.get("conversation_summary"),
+                    "confidence": None  # LangChain queries don't have confidence scores yet
+                }
+                
+                # Cache result
+                st.session_state.query_cache[cache_key] = result
+                return result
+            else:
+                # LangChain failed, fall back to regular execution
+                error = lc_result.get("error", "Unknown error")
+                st.warning(f"LangChain processing failed: {error}. Using standard query...")
+        
+        # Standard query execution
         # Capture verbose output if requested
         verbose_output = None
         old_stdout = None
@@ -279,6 +346,40 @@ def render_sidebar():
             help="Display agent reasoning and intermediate steps"
         )
         
+        # LangChain features toggle
+        st.markdown("---")
+        st.subheader("🧠 LangChain Features")
+        
+        if LANGCHAIN_AVAILABLE and st.session_state.get("langchain_engine"):
+            use_memory = st.checkbox(
+                "💬 Conversational Memory",
+                value=True,
+                help="Remember context for follow-up questions (e.g., 'Now show me poverty rate')"
+            )
+            
+            use_rag = st.checkbox(
+                "📚 RAG Variable Search",
+                value=True,
+                help="Use semantic search to find better Census variables"
+            )
+            
+            # Show conversation history
+            if use_memory:
+                engine = st.session_state.langchain_engine
+                history_summary = engine.get_conversation_history()
+                if history_summary and history_summary.strip():
+                    with st.expander("📜 Conversation Context", expanded=False):
+                        st.markdown(history_summary)
+                    
+                    if st.button("🗑️ Clear Conversation", help="Clear conversation memory"):
+                        engine.clear_memory()
+                        st.success("Conversation cleared!")
+                        st.rerun()
+        else:
+            st.info("LangChain features not available")
+            use_memory = False
+            use_rag = False
+        
         st.markdown("---")
         
         # Info section
@@ -314,7 +415,7 @@ def render_sidebar():
             st.session_state.query_cache = {}
             st.success("Cache cleared!")
         
-        return mode, verbose
+        return mode, verbose, use_memory, use_rag
 
 
 def render_example_queries():
@@ -396,6 +497,10 @@ def reset_variable_chat_history():
     st.session_state.variable_chat_history = _default_variable_chat_history()
     helper = get_variable_chat_helper()
     helper.reset_history()
+    
+    # Clear LangChain memory for Variable Assistant
+    if st.session_state.get("variable_chat_memory"):
+        st.session_state.variable_chat_memory.clear()
 
 
 def _handle_variable_chat_prompt(question: str):
@@ -409,10 +514,63 @@ def _handle_variable_chat_prompt(question: str):
     with st.chat_message("assistant"):
         with st.spinner("Checking ACS documentation..."):
             try:
+                # Check if RAG is available and enabled for better semantic search
+                use_rag_for_variables = False
+                rag_suggestions = []
+                
+                if st.session_state.get("langchain_engine") and hasattr(st.session_state.langchain_engine, 'rag'):
+                    try:
+                        # Use RAG for semantic search of variables
+                        if st.session_state.langchain_engine.rag:
+                            rag_suggestions = st.session_state.langchain_engine.get_rag_suggestions(question, top_k=5)
+                            if rag_suggestions:
+                                use_rag_for_variables = True
+                                # Show RAG was used
+                                st.caption("🔍 Using semantic search...")
+                    except Exception as e:
+                        print(f"RAG search failed: {e}")
+                
                 reply = agent.answer_question(question)
                 answer = reply.get("answer", "")
                 candidates = reply.get("candidates", [])
                 doc_snippets = reply.get("doc_snippets", [])
+                
+                # If RAG found better matches, merge them with candidates
+                if use_rag_for_variables and rag_suggestions:
+                    # Convert RAG results to candidate format
+                    rag_candidates = []
+                    for rag_match in rag_suggestions:
+                        rag_candidates.append({
+                            "variable_id": rag_match.get("variable_id"),
+                            "label": rag_match.get("label"),
+                            "score": rag_match.get("score", 0) * 100,  # Convert to 0-100 scale
+                            "source": "RAG"
+                        })
+                    
+                    # Merge and deduplicate
+                    seen_vars = set()
+                    merged_candidates = []
+                    
+                    # Prioritize RAG results (better semantic matching)
+                    for cand in rag_candidates:
+                        var_id = cand.get("variable_id")
+                        if var_id and var_id not in seen_vars:
+                            merged_candidates.append(cand)
+                            seen_vars.add(var_id)
+                    
+                    # Add original candidates if not already included
+                    for cand in candidates[:3]:  # Limit original to avoid too many
+                        var_id = cand.get("variable_id")
+                        if var_id and var_id not in seen_vars:
+                            merged_candidates.append(cand)
+                            seen_vars.add(var_id)
+                    
+                    candidates = merged_candidates
+                    
+                    # Enhance answer to mention RAG was used
+                    if answer and not answer.startswith("I couldn't"):
+                        answer = f"**Using semantic search**, here's what I found:\n\n{answer}"
+                
             except Exception as exc:
                 answer = (
                     "Unable to reach the variable assistant right now. "
@@ -436,14 +594,70 @@ def _handle_variable_chat_prompt(question: str):
         "candidates": candidates,
         "doc_snippets": doc_snippets
     })
+    
+    # Track in LangChain memory for Variable Assistant
+    if st.session_state.get("variable_chat_memory"):
+        memory = st.session_state.variable_chat_memory
+        # Extract key information from the conversation
+        discussed_variables = [c.get("variable_id") for c in candidates if c.get("variable_id")]
+        variable_ids = ", ".join(discussed_variables[:3]) if discussed_variables else None
+        
+        memory.add_query(
+            query=question,
+            measure=None,  # Variable chat doesn't have measures
+            variable_id=variable_ids,
+            result_count=len(candidates),
+            successful=True
+        )
 
     st.rerun()
+
+
+def _format_variable_chat_context(memory) -> str:
+    """Format conversation context specifically for Variable Assistant."""
+    if not memory or not memory.history:
+        return ""
+    
+    lines = ["**Recent Variable Discussions:**\n"]
+    
+    for i, ctx in enumerate(memory.history[-5:], 1):  # Last 5 conversations
+        query_preview = ctx.query[:60] + "..." if len(ctx.query) > 60 else ctx.query
+        lines.append(f"{i}. *{query_preview}*")
+        
+        if ctx.variable_id:
+            # Variable IDs are comma-separated from our tracking
+            var_ids = ctx.variable_id.split(", ")[:3]  # Show up to 3
+            lines.append(f"   - Variables: {', '.join(var_ids)}")
+        
+        if ctx.result_count:
+            lines.append(f"   - Found: {ctx.result_count} suggestion(s)")
+        
+        lines.append("")  # Blank line between items
+    
+    if memory.current_context and memory.current_context.variable_id:
+        lines.append("\n**Currently Discussing:**")
+        var_ids = memory.current_context.variable_id.split(", ")[:3]
+        lines.append(f"Variables: {', '.join(var_ids)}")
+    
+    return "\n".join(lines)
 
 
 def render_variable_chatbox():
     """Render the chat interface for asking about ACS variables."""
     st.markdown("### Variable Assistant")
     st.caption("Chat with the LLM to learn which ACS variables cover a topic or how to reference them.")
+
+    # Show conversation context if LangChain memory is available
+    if st.session_state.get("variable_chat_memory"):
+        memory = st.session_state.variable_chat_memory
+        
+        if memory.history:  # Only show if there's history
+            context_summary = _format_variable_chat_context(memory)
+            
+            if context_summary and context_summary.strip():
+                with st.expander("📜 Variable Chat Context", expanded=False):
+                    st.markdown(context_summary)
+                    st.caption("*The assistant remembers these variables from your conversation*")
 
     clear_col, spacer_col = st.columns([1, 6])
     with clear_col:
@@ -765,17 +979,19 @@ def render_query_metadata(result: dict):
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        mode_emoji = "⚡" if result["mode"] == "single" else "🤖"
+        mode = result.get("mode", "single")
+        mode_emoji = "⚡" if mode == "single" else "🤖"
         st.metric(
             "Mode",
-            f"{mode_emoji} {result['mode'].title()}-Agent"
+            f"{mode_emoji} {mode.title()}-Agent"
         )
     
     with col2:
-        time_color = "🟢" if result["execution_time"] < 5 else "🟡" if result["execution_time"] < 10 else "🔴"
+        exec_time = result.get("execution_time", 0)
+        time_color = "🟢" if exec_time < 5 else "🟡" if exec_time < 10 else "🔴"
         st.metric(
             "Execution Time",
-            f"{time_color} {result['execution_time']:.2f}s"
+            f"{time_color} {exec_time:.2f}s"
         )
     
     with col3:
@@ -811,11 +1027,20 @@ def main():
     init_session_state()
     
     # Render sidebar
-    mode, verbose = render_sidebar()
+    mode, verbose, use_memory, use_rag = render_sidebar()
     
     # Main content
     st.title("🗺️ Louisiana Census Data Explorer")
     st.markdown("Ask questions about Louisiana census tracts in natural language")
+    
+    # Show LangChain features status
+    if use_memory or use_rag:
+        features = []
+        if use_memory:
+            features.append("💬 Memory")
+        if use_rag:
+            features.append("📚 RAG")
+        st.info(f"🧠 LangChain Features Active: {' + '.join(features)}")
     
     # Query input
     st.markdown("### 🔍 Enter Your Query")
@@ -869,8 +1094,15 @@ def main():
             force_refresh = True
         
         # Execute query
-        with st.spinner(f"{'⚡ Querying...' if mode == 'single' else '🤖 Multi-agent system processing... (may take 30-60 seconds)'}"):
-            result = execute_query(query, mode, verbose, force_refresh=force_refresh)
+        with st.spinner(f"{'⚡ Querying...' if mode == 'single' else '🤖 Multi-agent system processing... (may take 30-120 seconds)'}"):
+            result = execute_query(
+                query, 
+                mode, 
+                verbose, 
+                force_refresh=force_refresh,
+                use_memory=use_memory,
+                use_rag=use_rag
+            )
         
         # Store result
         st.session_state.current_result = result
@@ -888,7 +1120,7 @@ def main():
             if "timed out" in error_msg.lower() or "timeout" in error_msg.lower():
                 st.warning("**⏱️ Request Timeout Detected**")
                 st.markdown("""
-                The multi-agent system took too long to process your request (>60 seconds).
+                The multi-agent system took too long to process your request (>120 seconds).
                 
                 **Why this happens:**
                 - The Variable Agent searches through 30,000+ Census variables
@@ -962,6 +1194,24 @@ def main():
             return
         
         st.markdown("---")
+        
+        # Show LangChain context if available
+        if result.get("is_follow_up"):
+            st.success("🔄 **Follow-up question detected!**")
+            inferred = result.get("inferred_context", {})
+            if inferred:
+                context_parts = []
+                if inferred.get("parish"):
+                    context_parts.append(f"Parish: {inferred['parish']}")
+                if inferred.get("measure"):
+                    context_parts.append(f"Measure: {inferred['measure']}")
+                st.caption(f"Using context from previous query: {', '.join(context_parts)}")
+        
+        if result.get("rag_context"):
+            with st.expander("📚 RAG Variable Suggestions", expanded=False):
+                for match in result["rag_context"][:3]:
+                    st.markdown(f"**{match['variable_id']}** (score: {match['score']:.2f})")
+                    st.caption(match['label'])
         
         # Show metadata
         render_query_metadata(result)
